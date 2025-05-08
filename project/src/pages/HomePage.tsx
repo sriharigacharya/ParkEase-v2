@@ -41,59 +41,60 @@ const HomePage: React.FC = () => {
     return R * c;
   };
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      console.warn('Geolocation not supported');
-      return;
-    }
-  
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-  
-    // Use getCurrentPosition first to force a high-accuracy fix
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+// Improved geolocation useEffect
+useEffect(() => {
+  if (!navigator.geolocation) {
+    console.warn('Geolocation not supported');
+    return;
+  }
+
+  const options = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  };
+
+  // Use getCurrentPosition first to force a high-accuracy fix
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      setUserCoords({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      });
+      setPositionAccuracy(position.coords.accuracy);
+      setLastUpdate(Date.now());
+    },
+    (error) => {
+      console.error('Initial geolocation failed:', error);
+    },
+    options
+  );
+
+  // Then start watching position
+  const id = navigator.geolocation.watchPosition(
+    (position) => {
+      if (
+        Date.now() - lastUpdate > 5000 ||
+        position.coords.accuracy < (positionAccuracy ?? Infinity)
+      ) {
         setUserCoords({
           lat: position.coords.latitude,
           lng: position.coords.longitude
         });
         setPositionAccuracy(position.coords.accuracy);
         setLastUpdate(Date.now());
-      },
-      (error) => {
-        console.error('Initial geolocation failed:', error);
-      },
-      options
-    );
-  
-    // Then start watching position
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        if (
-          Date.now() - lastUpdate > 5000 ||
-          position.coords.accuracy < (positionAccuracy ?? Infinity)
-        ) {
-          setUserCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setPositionAccuracy(position.coords.accuracy);
-          setLastUpdate(Date.now());
-        }
-      },
-      (error) => console.error('Watch error:', error),
-      options
-    );
-  
-    setWatchId(id);
-  
-    return () => {
-      if (id) navigator.geolocation.clearWatch(id);
-    };
-  }, []);
+      }
+    },
+    (error) => console.error('Watch error:', error),
+    options
+  );
+
+  setWatchId(id);
+
+  return () => {
+    if (id) navigator.geolocation.clearWatch(id);
+  };
+}, []);
   
   
 
