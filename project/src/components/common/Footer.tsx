@@ -34,9 +34,8 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Contact</h3>
             <ul className="space-y-2 text-sm">
-              <li>Email: info@parkease.com</li>
-              <li>Phone: +1 (555) 123-4567</li>
-              <li>Address: 123 Parking Avenue, City</li>
+              <li>Email: 2023ci_snettikantiajay_b@nie.ac.in</li>
+              <li>Address: NIE North,Mysuru</li>
             </ul>
           </div>
         </div>

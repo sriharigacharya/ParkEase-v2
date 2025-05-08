@@ -1,7 +1,7 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Car, Users, MapPin, Star, DollarSign, MessageSquare, CalendarPlus, Briefcase, Settings as SettingsIcon } from 'lucide-react';
+import { Car, Users, MapPin, Star, IndianRupee, MessageSquare, CalendarPlus, Briefcase, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext'; // Adjust path if needed
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -135,7 +135,7 @@ const AdminDashboard: React.FC = () => {
       // case 'employee':
       //   return <Users className="h-5 w-5 text-purple-700" />;
       // case 'rate_update':
-      //    return <DollarSign className="h-5 w-5 text-yellow-700" />;
+      //    return <IndianRupee className="h-5 w-5 text-yellow-700" />;
       default:
         return <Briefcase className="h-5 w-5 text-gray-700" />;
     }
@@ -195,7 +195,7 @@ const AdminDashboard: React.FC = () => {
         <StatCard
           title="Hourly Rate"
           value={stats?.hourlyRate !== null && stats?.hourlyRate !== undefined ? stats.hourlyRate.toFixed(2) : undefined}
-          icon={<DollarSign className="h-6 w-6 text-primary-600" />}
+          icon={<IndianRupee className="h-6 w-6 text-primary-600" />}
           suffix="/ hr"
           to="/admin/settings" // Link to manage settings, including hourly rate
           loading={loadingStats}

@@ -1,7 +1,5 @@
-// HomePage.tsx
-
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // Make sure axios is imported
+import axios from 'axios';
 import { MapPin } from 'lucide-react';
 import LocationCard from '../components/common/LocationCard';
 import LocationFilters, { FilterValues } from '../components/filters/LocationFilters';
@@ -14,120 +12,143 @@ type Location = {
   totalSlots: number;
   availableSlots: number;
   coverImageUrl: string;
-  averageRating: number; // Ensure your API returns this as a number
+  averageRating: number;
   distance?: number;
-  // Add feedbackCount if your public API provides it and you need it for LocationCard
-  // feedbackCount?: number;
 };
 
 const HomePage: React.FC = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [positionAccuracy, setPositionAccuracy] = useState<number | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState(0);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const R = 6371;
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    
     return R * c;
   };
 
   useEffect(() => {
-    const getUserLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setUserCoords({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            });
-          },
-          (error) => {
-            console.error('Error getting user location:', error);
-            // setError('Unable to get your location. Please enable location services.'); 
-            // You might want to handle this more gracefully, e.g., don't sort by distance
-          }
-        );
-      } else {
-        // setError('Geolocation is not supported by this browser.');
-        console.warn('Geolocation is not supported by this browser.');
-      }
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not supported');
+      return;
+    }
+  
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
     };
-    getUserLocation();
+  
+    // Use getCurrentPosition first to force a high-accuracy fix
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setPositionAccuracy(position.coords.accuracy);
+        setLastUpdate(Date.now());
+      },
+      (error) => {
+        console.error('Initial geolocation failed:', error);
+      },
+      options
+    );
+  
+    // Then start watching position
+    const id = navigator.geolocation.watchPosition(
+      (position) => {
+        if (
+          Date.now() - lastUpdate > 5000 ||
+          position.coords.accuracy < (positionAccuracy ?? Infinity)
+        ) {
+          setUserCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setPositionAccuracy(position.coords.accuracy);
+          setLastUpdate(Date.now());
+        }
+      },
+      (error) => console.error('Watch error:', error),
+      options
+    );
+  
+    setWatchId(id);
+  
+    return () => {
+      if (id) navigator.geolocation.clearWatch(id);
+    };
   }, []);
+  
+  
 
   useEffect(() => {
-    const fetchLocationsData = async () => {
+    const fetchLocations = async () => {
       try {
         setLoading(true);
-        setError(null); // Clear previous errors
-
-        // Replace mock data with an API call
-        // Assuming your public endpoint for locations is GET /api/locations
-        const response = await axios.get('/api/locations'); 
-        let fetchedLocations: Location[] = response.data;
-
-        // IMPORTANT: Check if backend data needs transformation
-        // (like snake_case to camelCase, or string numbers to actual numbers)
-        // If your /api/locations endpoint sends snake_case or averageRating as a string,
-        // you'll need to transform it here, similar to what we did for AdminLocations.
-        // Example transformation (adapt as needed):
-        fetchedLocations = fetchedLocations.map((loc: any) => ({
+        const response = await axios.get('/api/locations');
+        
+        let fetchedLocations: Location[] = response.data.map((loc: any) => ({
           id: loc.id,
           name: loc.name,
-          latitude: loc.latitude, // Ensure these are numbers
-          longitude: loc.longitude, // Ensure these are numbers
-          totalSlots: loc.totalSlots || loc.total_slots, // Handle potential casing
-          availableSlots: loc.availableSlots || loc.available_slots,
-          coverImageUrl: loc.coverImageUrl || loc.cover_image_url,
+          latitude: parseFloat(loc.latitude?.toFixed(6)),
+          longitude: parseFloat(loc.longitude?.toFixed(6)),
+          totalSlots: loc.totalSlots || loc.total_slots || 0,
+          availableSlots: loc.availableSlots || loc.available_slots || 0,
+          coverImageUrl: loc.coverImageUrl || loc.cover_image_url || '',
           averageRating: typeof loc.averageRating === 'string' 
-                            ? parseFloat(loc.averageRating) 
-                            : (loc.averageRating || (typeof loc.average_rating === 'string' ? parseFloat(loc.average_rating) : loc.average_rating) || 0),
-          // distance will be calculated next
+            ? parseFloat(loc.averageRating) 
+            : (loc.averageRating || 
+              (typeof loc.average_rating === 'string' 
+                ? parseFloat(loc.average_rating) 
+                : loc.average_rating) || 0),
         }));
 
-        console.log('Fetched and Transformed Locations (HomePage):', fetchedLocations); // <<--- ADD OR CONFIRM THIS LOG
-
         if (userCoords) {
-          fetchedLocations.forEach(location => {
-            if (typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-                location.distance = calculateDistance(
-                    userCoords.lat,
-                    userCoords.lng,
-                    location.latitude,
-                    location.longitude
-                );
-            } else {
-                location.distance = undefined; // Or some default large value
-            }
-          });
-          fetchedLocations.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+          fetchedLocations = fetchedLocations.map(location => ({
+            ...location,
+            distance: calculateDistance(
+              userCoords.lat,
+              userCoords.lng,
+              location.latitude,
+              location.longitude
+            )
+          })).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
         }
 
         setLocations(fetchedLocations);
         setFilteredLocations(fetchedLocations);
       } catch (err) {
         console.error('Error fetching locations:', err);
-        setError('Failed to load parking locations. Please try again later.');
+        setError('Failed to load parking locations');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLocationsData();
-  }, [userCoords]); // Re-fetch if userCoords change to recalculate distances and sort
+    fetchLocations();
+  }, [userCoords]);
 
   const handleFilterChange = (filters: FilterValues) => {
-    // ... (your existing filter logic should work if locations data is correct) ...
     const filtered = locations.filter(location => {
-      const distanceFilter = !userCoords || typeof location.distance === 'undefined' || location.distance <= filters.distance;
+      const distanceFilter = !userCoords || 
+                           !location.distance || 
+                           location.distance <= filters.distance;
       const slotsFilter = location.availableSlots >= filters.minAvailableSlots;
       const ratingFilter = location.averageRating >= filters.minRating;
       return distanceFilter && slotsFilter && ratingFilter;
@@ -135,40 +156,53 @@ const HomePage: React.FC = () => {
     setFilteredLocations(filtered);
   };
 
-  // ... rest of your component (return JSX) ...
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-secondary-900 mb-2">Find Parking Near You</h1>
         <p className="text-secondary-600">
-          Discover available parking spots in your area, check real-time availability, and book in advance.
+          Discover available parking spots in your area
         </p>
       </div>
       
-      {userCoords ? (
-        <div className="flex items-center text-sm text-primary-600 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div className="flex items-center text-sm">
           <MapPin className="h-5 w-5 mr-1" />
-          <span>Using your current location ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})</span>
+          {userCoords ? (
+            <>
+              <span className="text-primary-600">
+                Current location: {userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}
+              </span>
+              {positionAccuracy && (
+                <span className="text-xs text-gray-500 ml-2">
+                  (Accuracy: ±{positionAccuracy.toFixed(0)}m)
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-secondary-500">
+              Acquiring your location...
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="flex items-center text-sm text-secondary-500 mb-6">
-          <MapPin className="h-5 w-5 mr-1" />
-          <span>Enable location services to find nearby parking or view all locations.</span>
+        
+        <div className="w-full sm:w-auto">
+          <LocationFilters onFilterChange={handleFilterChange} />
         </div>
-      )}
-      
-      <LocationFilters onFilterChange={handleFilterChange} />
-      
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
         </div>
       ) : error ? (
-        <div className="text-center text-red-500 p-4 bg-red-50 rounded-md">{error}</div>
+        <div className="text-center text-red-500 p-4 bg-red-50 rounded-md">
+          {error}
+        </div>
       ) : filteredLocations.length === 0 ? (
         <div className="text-center p-8 bg-secondary-50 rounded-lg">
-          <p className="text-lg text-secondary-700">No parking locations found matching your filters.</p>
-          <p className="text-sm text-secondary-500 mt-2">Try adjusting your filter settings.</p>
+          <p className="text-lg text-secondary-700">No matching locations found</p>
+          <p className="text-sm text-secondary-500 mt-2">Try adjusting your filters</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -182,9 +216,25 @@ const HomePage: React.FC = () => {
               totalSlots={location.totalSlots}
               averageRating={location.averageRating}
               coverImageUrl={location.coverImageUrl}
-              // feedbackCount={location.feedbackCount} // Add if needed by LocationCard and provided by API
             />
           ))}
+        </div>
+      )}
+      
+      {/* Development-only debug overlay */}
+      {import.meta.env.DEV && userCoords && (
+        <div className="fixed bottom-4 right-4 bg-white p-3 shadow-lg rounded-lg text-xs z-50">
+          <div>Lat: {userCoords.lat.toFixed(6)}</div>
+          <div>Lng: {userCoords.lng.toFixed(6)}</div>
+          <div>Accuracy: {positionAccuracy?.toFixed(0)}m</div>
+          <a 
+            href={`https://www.google.com/maps?q=${userCoords.lat},${userCoords.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 text-xs block mt-1"
+          >
+            Verify on Map
+          </a>
         </div>
       )}
     </div>

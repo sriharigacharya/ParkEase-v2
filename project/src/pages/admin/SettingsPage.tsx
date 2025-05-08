@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { DollarSign, AlertCircle, CheckCircle } from 'lucide-react';
+import { IndianRupee, AlertCircle, CheckCircle } from 'lucide-react';
 
 const AdminSettingsPage: React.FC = () => {
     const [currentRate, setCurrentRate] = useState<number | null>(null);
@@ -57,7 +57,7 @@ const AdminSettingsPage: React.FC = () => {
             const response = await axios.post('/api/admin/rate', { hourlyRate: rateValue });
             setCurrentRate(response.data.hourlyRate); // Update displayed current rate
             setNewRate(response.data.hourlyRate.toString()); // Reset input to new current rate
-            setSuccessMessage(`Hourly rate successfully updated to $${response.data.hourlyRate.toFixed(2)}.`);
+            setSuccessMessage(`Hourly rate successfully updated to ₹${response.data.hourlyRate.toFixed(2)}.`);
         } catch (err: any) {
             console.error('Error updating hourly rate:', err);
             setError(err.response?.data?.message || 'Failed to update hourly rate. Please try again.');
@@ -87,10 +87,10 @@ const AdminSettingsPage: React.FC = () => {
 
                 {!loading && currentRate !== null && (
                     <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-md flex items-center">
-                        <DollarSign className="h-6 w-6 text-primary-600 mr-3" />
+                        <IndianRupee className="h-6 w-6 text-primary-600 mr-3" />
                         <div>
                             <p className="text-sm text-primary-700 font-medium">Current Hourly Rate:</p>
-                            <p className="text-2xl font-bold text-primary-600">${currentRate.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-primary-600">₹{currentRate.toFixed(2)}</p>
                         </div>
                     </div>
                 )}
@@ -112,7 +112,7 @@ const AdminSettingsPage: React.FC = () => {
                 <form onSubmit={handleSubmitRate} className="space-y-6">
                     <div>
                         <label htmlFor="hourlyRate" className="block text-sm font-medium text-secondary-700 mb-1">
-                            Set New Hourly Rate ($)
+                            Set New Hourly Rate (₹)
                         </label>
                         <input
                             type="number"
